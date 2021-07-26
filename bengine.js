@@ -1,4 +1,142 @@
 const bengine = (function(){
+    const {
+        SquerMap, Squer, Point
+    } = (function(){
+    
+    const NullNode = null
+    
+    class Point {
+        constructor({x = 0, y = 0, z = 0} = {}){
+            this.x = x
+            this.y = y
+            this.z = z
+        }
+        add(other){
+            return new Point({
+                x: this.x + other.x,
+                y: this.y + other.y,
+                z: this.z + other.z
+            })
+        }
+        equal(o){
+            return this.x === o.x || this.y === o.y || this.z === o.z
+        }
+    }
+    
+    class Squer {
+        constructor({point, width, height}){
+            this.point = point
+            this.width = width
+            this.height = height
+        }
+        intersect(other){
+            const {width, height, point} = other
+            const lox = point.x
+            const rox = point.x + width
+            const lmx = this.point.x
+            const rmx = this.point.x + this.width
+    
+            const loy = point.y
+            const roy = point.y + height
+            const lmy = this.point.y
+            const rmy = this.point.y + this.height
+            const isXIntersect = lox < rmx && lmx < rox
+            const isYIntersect = loy < rmy && lmy < roy
+    
+            return isXIntersect && isYIntersect
+        }
+    }
+    function getDeepSquers({point, width, height}){
+        width /= 2
+        height /= 2
+        const upLhsSquer = new Squer({width, height, point})
+        const downLhsSquer = new Squer({
+            width, height, point: point.add({x: 0, y: height})
+        })
+        const upRhsSquer = new Squer({
+            width, height, point: point.add({x: width, y: 0})
+        })
+        const downRhsSquer = new Squer({
+            width, height, point: point.add({x: width, y: height})
+        })
+        return {
+            upLhsSquer,
+            downLhsSquer,
+            upRhsSquer,
+            downRhsSquer
+        }
+    }
+    class SquerNode {
+        constructor(squer, deepLength){
+            this.squer = ()=>squer
+            this.deepLength = ()=>deepLength
+        }
+        initialized = false
+        upLhsNode = NullNode
+        downLhsNode = NullNode
+        upRhsNode = NullNode
+        downRhsNode = NullNode
+        data = []
+        initialize(){
+            const deep = this.deepLength() - 1
+            const {
+                upLhsSquer, downLhsSquer, upRhsSquer, downRhsSquer
+            } = getDeepSquers(this.squer()) 
+            this.upLhsNode = new SquerNode(upLhsSquer, deep)
+            this.downLhsNode = new SquerNode(downLhsSquer, deep)
+            this.upRhsNode = new SquerNode(upRhsSquer, deep)
+            this.downRhsNode = new SquerNode(downRhsSquer, deep)
+            this.initialized = true
+        }
+        get deepNodes(){
+            return [
+                this.upLhsNode,
+                this.downLhsNode,
+                this.upRhsNode,
+                this.downRhsNode
+            ]
+        }
+        check(squer, handler){
+            if(this.squer().intersect(squer)){
+                handler(this, this.data)
+            }
+        }
+        insert(squer, handler = ()=>{}){
+            this.check(squer, function(node, data){
+                if(node.initialized){
+                    node.deepNodes.forEach(deepNode=>deepNode.insert(squer, handler))
+                } else {
+                    if(data.length === 0){
+                        data.push(squer)
+                    } else {
+                        if(node.deepLength() === 0){
+                            data.push(squer)
+                            handler(node, data)
+                        } else {
+                            node.initialize()
+                            node.data.forEach(el=>node.insert(el))
+                            node.data.length = 0
+                            node.insert(squer, handler)
+                        }
+                    }
+                }
+            })
+        }
+        erase(squer){
+            this.check(squer, function(node, data){
+                if(node.initialized){
+                    node.deepNodes.forEach(n=>n.erase(squer))
+                } else {
+                    node.data = data.filter(candidate=>candidate !== squer)
+                }
+            })
+        }
+    }
+    
+    return {SquerMap: SquerNode, Squer, Point}
+    
+    })()
+
     function sortClassComparator(lhs, rhs){
         return lhs === rhs? 0: lhs.prototype instanceof rhs? -1 : 1
     }
@@ -198,5 +336,5 @@ const bengine = (function(){
             await renderer.render(scene)
         }
     }
-    return { Renderer, GameObject, Scene, Collisioner, CollideReactor, createGameProcess }
+    return { Renderer, GameObject, Scene, Collisioner, CollideReactor, createGameProcess, Squer, Point }
 })()
