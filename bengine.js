@@ -325,15 +325,18 @@ const bengine = (function(){
         
     }
     
-    function createGameProcess(renderer, collisioner, collideReactor){
+    function createGameProcess(renderer, collisioner, collideReactor, clearPlace = async function(){}){
         let timestamp = Date.now() - 1
-        return async function gameProcess(scene){
+        return async function multiplyGameProcess(...scenes){
             const dt = Date.now() - timestamp
             timestamp = Date.now()
-            await scene.update(dt)
-            const collisions = await collisioner.checkCollision(scene)
-            await collideReactor.react(...collisions)
-            await renderer.render(scene)
+            await Promise.all(scenes.map(scene=>scene.update(dt)))
+            await Promise.all(scenes.map(async scene=>{
+                const collisions = await collisioner.checkCollision(scene)
+                await collideReactor.react(...collisions)
+            }))
+            await clearPlace()
+            await Promise.all(scenes.map(scene=>renderer.render(scene)))
         }
     }
     return { Renderer, GameObject, Scene, Collisioner, CollideReactor, createGameProcess, Squer, Point }
